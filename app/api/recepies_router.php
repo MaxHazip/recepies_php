@@ -36,7 +36,7 @@ $path = parse_url(
 );
 
 if (
-    $path == "/register" || $path == "/auth"
+    $path == "/recipe-api/register" || $path == "/recipe-api/auth"
 ) {
 
     require __DIR__ . "/auth.php";
