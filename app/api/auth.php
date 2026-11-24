@@ -50,13 +50,17 @@ function validate_data(
 
     } else {
 
-        $hasLowerCase = preg_match('/[a-z]/', $data["password"]);
-        $hasUpperCase = preg_match('/[A-Z]/', $data["password"]);
-        $hasSpecial = preg_match('/[#_-$]/', $data["password"]);
+        if ($mode == "register") {
 
-        if (!$hasLowerCase) $errors["password"][] = "Field password has no lower case char";
-        if (!$hasUpperCase) $errors["password"][] = "Field password has no upper case char";
-        if (!$hasSpecial) $errors["password"][] = "Field password has no special char";
+            $hasLowerCase = preg_match('/[a-z]/', $data["password"]);
+            $hasUpperCase = preg_match('/[A-Z]/', $data["password"]);
+            $hasSpecial = preg_match('/[#_$-]/', $data["password"]);
+
+            if (!$hasLowerCase) $errors["password"][] = "Field password has no lower case char";
+            if (!$hasUpperCase) $errors["password"][] = "Field password has no upper case char";
+            if (!$hasSpecial) $errors["password"][] = "Field password has no special char";
+            
+        }
 
     }
 
@@ -134,7 +138,7 @@ if (
 
         $stmt = $pdo->prepare(
             "
-                INSERT INTO users (email, password, role)
+                INSERT INTO users (email, password_hash, role)
                 VALUES (:email, :hashed_password, 'user');
             "
         );
@@ -152,8 +156,6 @@ if (
             ],
             201
         );
-
-        exit;
 
     }
 
@@ -198,7 +200,7 @@ if (
 
         $stmt = $pdo->prepare(
             "
-                SELECT id, password_hash FROM users
+                SELECT id, password_hash, role FROM users
                 WHERE email = :email;
             "
         );
@@ -223,7 +225,7 @@ if (
 
         }
 
-        if (!$user || !password_verify($data["password"], $hashed_password) || $data["role"] != "user") {
+        if (!$user || !password_verify($data["password"], $hashed_password) || $user["role"] != "user") {
             sendjson(
                 [
                     "message" => "No such email or wrong password"
@@ -242,7 +244,7 @@ if (
             "
         );
 
-        $expire = time() + (30 * 60);
+        $expire = date("Y-m-d H:i:s", time() + (30 * 60));
 
         $stmt->execute(
             [
@@ -272,7 +274,7 @@ if (
 
         sendjson(
             [
-                "token" => "{$token['id']} | {$token['token_hash']}"
+                "token" => "{$token['id']} | {$secret}"
             ],
             200
         );

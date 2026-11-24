@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . "/helper.php";
+require_once __DIR__ . "/env_ini.php";
 
 $host = $_ENV["HOST"];
 $dbName = $_ENV["DBNAME"];
