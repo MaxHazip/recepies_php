@@ -1,12 +1,10 @@
 <?php
-require_once __DIR__ . "/recepies_router.php";
+require_once __DIR__ . "/../core/helper.php";
 
 $method = $_SERVER["REQUEST_METHOD"];
 
 $allowed_register_methods = ["POST"];
 $allowed_auth_methods = ["POST"];
-
-$auth_regex = "/auth";
 
 /** @var PDO $pdo */ 
 $pdo = require __DIR__ . "/../core/database.php";
@@ -48,7 +46,16 @@ function validate_data(
 
         $errors["password"][] = "Field password is missing";
 
-    } else {
+    } else if (!is_string($data["password"])) {
+
+        $errors["password"][] = "Field password is not string";
+
+    } else if (trim($data["password"]) === "") {
+
+        $errors["password"][] = "Field password is empty";
+
+    }
+    else {
 
         if ($mode == "register") {
 
@@ -59,7 +66,8 @@ function validate_data(
             if (!$hasLowerCase) $errors["password"][] = "Field password has no lower case char";
             if (!$hasUpperCase) $errors["password"][] = "Field password has no upper case char";
             if (!$hasSpecial) $errors["password"][] = "Field password has no special char";
-            
+            if (mb_strlen($data["password"]) < 5) $errors["password"][] = "Field email must exceed 5";
+
         }
 
     }
@@ -69,7 +77,18 @@ function validate_data(
         $errors["email"][] = "Field email is missing";
 
     } else if (
-        !preg_match("/[A-Za-z0-9]+[-._]*[A-Za-z0-9]+@[A-Za-z0-9]+[-]*[A-Za-z0-9]\.[A-Za-z]{2,}/", $data["email"])
+        !is_string($data["email"]) 
+    ) {
+
+        $errors["email"][] = "Field email is not a string";
+
+    } else if (trim($data["email"]) === "") {
+
+        $errors["email"][] = "Field email is empty";
+
+    }
+    else if (
+        !filter_var($data["email"], FILTER_VALIDATE_EMAIL)
     ) {
 
         $errors["email"][] = "Wrong format";
@@ -128,6 +147,7 @@ if (
         if ($errors) {
             sendjson(
                 [
+                    "message" => "Invalid fields",
                     "errors" => $errors
                 ],
                 422
@@ -143,12 +163,34 @@ if (
             "
         );
 
-        $stmt->execute(
-            [
-                "email" => $data["email"],
-                "hashed_password" => $hashed_password
-            ]
-        );
+        try {
+            $stmt->execute(
+                [
+                    "email" => trim($data["email"]),
+                    "hashed_password" => $hashed_password
+                ]
+            );
+        } catch (PDOException $e) {
+
+            $code = $e->errorInfo[1];
+
+            if ($code == 1062) {
+                sendjson(
+                    [
+                        "message" => "Пользователь уже существует"
+                    ],
+                    422
+                );
+            } else {
+                sendjson(
+                    [
+                        "message" => "Internal server error"
+                    ],
+                    500
+                );
+            }
+
+        }
 
         sendjson(
             [
@@ -192,6 +234,7 @@ if (
         if ($errors) {
             sendjson(
                 [
+                    "message" => "Invalid fields",
                     "errors" => $errors
                 ],
                 422
@@ -217,7 +260,7 @@ if (
 
         if (!$user) {
 
-            $hashed_password = "justFakePassword";
+            $hashed_password = password_hash("justFakePassword", PASSWORD_DEFAULT);
 
         } else {
 
@@ -225,12 +268,15 @@ if (
 
         }
 
-        if (!$user || !password_verify($data["password"], $hashed_password) || $user["role"] != "user") {
+        if (!$user && !password_verify($data["password"], $hashed_password) || $user["role"] != "user") {
             sendjson(
                 [
-                    "message" => "No such email or wrong password"
+                    "message" => "Invalid data",
+                    "errors" => [
+                        "email" => ["Invalid credentials"]
+                    ]
                 ],
-                401
+                422
             );
         }
 
@@ -256,25 +302,9 @@ if (
 
         $tokenId = (int)$pdo->lastInsertId();
 
-        $get_stmt = $pdo->prepare(
-            "
-                SELECT id, token_hash
-                FROM api_tokens
-                WHERE id = :token_id
-            "
-        );
-
-        $get_stmt->execute(
-            [
-                "token_id" => $tokenId
-            ]
-        );
-
-        $token = $get_stmt->fetch();
-
         sendjson(
             [
-                "token" => "{$token['id']} | {$secret}"
+                "token" => "{$tokenId}|{$secret}"
             ],
             200
         );

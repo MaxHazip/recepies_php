@@ -12,4 +12,8 @@ if (file_exists($envPath)) {
 
     }   
 
+} else {
+
+    throw new \RuntimeException("Файл окружения не найден: {$envPath}");
+
 }
