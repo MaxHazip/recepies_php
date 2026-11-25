@@ -1,14 +1,9 @@
 <?php
 
-$path = parse_url(
-    $_SERVER["REQUEST_URI"],
-    PHP_URL_PATH
-);
-
 function sendjson(
     array $message,
     int $code
-) {
+): never {
 
     http_response_code($code);
     header("Content-Type: application/json; charset=utf-8");
@@ -22,7 +17,7 @@ function sendjson(
 
 }
 
-function get_json_data() {
+function get_json_data(): array {
 
     $rawbody = file_get_contents("php://input");
 

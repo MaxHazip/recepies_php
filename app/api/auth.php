@@ -1,6 +1,12 @@
 <?php
 require_once __DIR__ . "/../core/helper.php";
 
+$path = parse_url(
+    $_SERVER["REQUEST_URI"],
+    PHP_URL_PATH
+);
+
+
 $method = $_SERVER["REQUEST_METHOD"];
 
 $allowed_register_methods = ["POST"];
@@ -12,7 +18,7 @@ $pdo = require __DIR__ . "/../core/database.php";
 function get_user_by_email(
     string $email,
     PDO $pdo
-) {
+): array|false {
 
     $stmt = $pdo->prepare(
         "
@@ -38,7 +44,7 @@ function validate_data(
     array $data,
     PDO $pdo,
     string $mode
-) {
+): array {
 
     $errors = [];
 
@@ -66,7 +72,7 @@ function validate_data(
             if (!$hasLowerCase) $errors["password"][] = "Field password has no lower case char";
             if (!$hasUpperCase) $errors["password"][] = "Field password has no upper case char";
             if (!$hasSpecial) $errors["password"][] = "Field password has no special char";
-            if (mb_strlen($data["password"]) < 5) $errors["password"][] = "Field email must exceed 5";
+            if (mb_strlen($data["password"]) < 5) $errors["password"][] = "Field password must be at least 5 characters long";
 
         }
 
@@ -172,16 +178,19 @@ if (
             );
         } catch (PDOException $e) {
 
-            $code = $e->errorInfo[1];
+            $code = $e->errorInfo[1] ?? null;
 
-            if ($code == 1062) {
+            if ($code === 1062) {
                 sendjson(
                     [
-                        "message" => "Пользователь уже существует"
+                        "message" => "This email is currently in use"
                     ],
                     422
                 );
             } else {
+
+                error_log($e->getMessage());
+
                 sendjson(
                     [
                         "message" => "Internal server error"
@@ -256,19 +265,17 @@ if (
 
         $user = $stmt->fetch();
 
-        $hashed_password = "";
+        $hashed_password = password_hash("justFakePassword", PASSWORD_DEFAULT);
 
-        if (!$user) {
-
-            $hashed_password = password_hash("justFakePassword", PASSWORD_DEFAULT);
-
-        } else {
+        if ($user) {
 
             $hashed_password = $user["password_hash"];
 
         }
 
-        if (!$user && !password_verify($data["password"], $hashed_password) || $user["role"] != "user") {
+        $isPasswordValid = password_verify($data["password"], $hashed_password);
+
+        if (!$user || !$isPasswordValid || $user["role"] != "user") {
             sendjson(
                 [
                     "message" => "Invalid data",

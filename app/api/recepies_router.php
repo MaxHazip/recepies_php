@@ -2,6 +2,11 @@
 
 require_once __DIR__ . "/../core/helper.php";
 
+$path = parse_url(
+    $_SERVER["REQUEST_URI"],
+    PHP_URL_PATH
+);
+
 if (
     $path == "/recipe-api/register" || $path == "/recipe-api/auth"
 ) {
